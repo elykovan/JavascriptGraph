@@ -1,0 +1,559 @@
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Graph</title>
+</head>
+<body>
+    <div id="shortestDistance">&nbsp;</div>
+    <canvas id="canvas1" width="500" height="500"  style="border: 1px solid black;"></canvas>
+
+    <input type="button" value="Mark Vertices" onclick="startMarkingVertices()" />
+    <input type="button" value="Cancel Marking Vertices" onclick="cancelMarkingVertices()" />
+    <input type="button" value="Calculate shortest distance" onclick="calculateShortestDistance()" />
+
+
+    <script>
+        (function () {
+            // create public graph object and expose a method that creates a graph object 
+            window.$Graph = {
+                createGraph: function () {
+                    return new Graph();
+                }
+            }
+            // undirected weighted graph
+            // cannot have loops, cannot have multiple edges. It's a graph - not a pseudograph
+            // uses adjacency lists. Lists are arrays.
+
+            // object that represents a graph. Edges are not directed. Cannot have multiple edges. Cannot have loops.
+            function Graph() {
+                this.vertices = []; // array containing vertices. Duplicate vertex labels are not allowed
+                this.addVertex = addVertex;
+                this.getVertex = getVertex;
+                this.addEdge = addEdge;
+                this.showEdges = showEdges;
+            }
+
+            // object that represents a vertex 
+            function Vertex(label, x, y) {
+                this.label = label;   // label for the vertex. Duplicate labels are not allowed 
+                this.x = x; // x coordinate
+                this.y = y; // y coordinate
+                this.connectedVertices = []; // array of connected vertices. Each connected vertex is an array: [<reference to vertex>, <distance (weight)>] 
+                this.index = 0; // index of vertex in the array. It's used to quickly find a vertex in the array if there is a need to remove it using array.splice(index, 1)
+                this.drawn = false; // used for rendering on the canvas
+            }
+
+
+            function addEdge(vertex1Label, vertex2Label, weight) {
+                if (vertex1Label === vertex2Label) return; // loops are not allowed
+                var v1 = this.getVertex(vertex1Label);
+                var v2 = this.getVertex(vertex2Label);
+
+                if (v1 != null && v2 != null) { // if both vertices exist
+                    for (var i = 0; i < v1.connectedVertices.length; i++) {
+                        if (v1.connectedVertices[i][0] === v2) return; // if the edge already exists
+                    }
+
+                    v1.connectedVertices.push([v2, weight]);
+                    v2.connectedVertices.push([v1, weight]);
+                }
+            }
+
+
+            function addVertex(label, x, y) {
+                // prevent duplicates
+                if (this.getVertex(label) !== null) {
+                    alert('Vertex already exists!');
+                    return;
+                }
+                vertex = new Vertex(label, x, y);
+                vertex.index = this.vertices.push(vertex) - 1;
+            }
+
+
+            // returns a reference to a vertex searched sequentially by label
+            function getVertex(label) {
+                for (var i = 0; i < this.vertices.length; i++) {
+                    if (this.vertices[i].label === label) return this.vertices[i];
+                }
+                return null;
+            }
+
+
+            function showEdges() {
+                var v = null;
+
+                for (var i = 0; i < this.vertices.length; i++) {
+                    v = this.vertices[i]; // get reference to a vertex
+                    console.log(v.label);
+
+                    for (var k = 0; k < v.connectedVertices.length; k++) {
+                        console.log(' --> ' + v.connectedVertices[k][0].label + ' (' + v.connectedVertices[k][1] + ')');
+                    }
+                }
+            }
+
+        }());
+
+
+        /*
+        Javascript MIN priority queue.
+        Implemented using an array.
+        The items stored have the following form: { index: <integer>, data: <some data> }. The index is used to place an object where it belongs in the queue.
+        All nodes are less than or equal to each of its children. An item with the smallest index is on top.
+        A heap could be built by successive insertions. This approach requires O(n log n) time because each insertion takes O(log n) time and there are n elements.
+        */
+
+        // done as Immediately Invoked Function Expression (IIFE)  
+        (function () {
+
+            // create public object and expose a method that returns an instance 
+            window.$MinPriorityQueue = { createMinPriorityQueue: function () { return new MinPriorityQueue(); } } // anonymous object with createMinPriorityQueue() method
+
+            // constructor
+            function MinPriorityQueue() {
+                this.iterateArray = iterateArray;
+                this.insert = insert;
+                this.remove = remove;
+                this.heapArray = []; // array for the min binary tree
+                this.empty = empty;
+            }
+
+
+            function empty() {
+                return this.heapArray.length === 0;
+            }
+
+            // remove item from the top and copy last item into a temp variable
+            // remove the last item from array
+            // then iterate, find children at each level and shift smaller child up
+            function remove() {
+                // copy the top item to be returned
+                var item = this.heapArray[0];
+                // copy top item into a temp variable and remove it from the bottom
+                var temp = this.heapArray.pop();
+
+                var i = 0; // first item
+                var smallerChild = 0;
+
+                // trickle down the top item
+                // loop while not last node and while parent bigger than smaller child
+                while (i < (this.heapArray.length - 1)) {
+                    var child1 = 2 * i + 1;
+                    var child2 = 2 * i + 2;
+
+                    if (this.heapArray[child2] === undefined && this.heapArray[child1] === undefined) {
+                        break;
+                    }
+                    else if (this.heapArray[child2] === undefined) {
+                        smallerChild = child1;
+                    }
+                    else if (this.heapArray[child1] === undefined) {
+                        smallerChild = child2;
+                    }
+                    else {
+                        smallerChild = (this.heapArray[child1].index < this.heapArray[child2].index) ? child1 : child2;
+                    }
+                    // break if current node is smaller than or equal to the smaller child
+                    if (this.heapArray[smallerChild].index >= temp.index) {
+                        break;
+                    }
+
+                    // current node is bigger than the smaller child, so, smaller child gets shifted up
+                    this.heapArray[i] = this.heapArray[smallerChild];
+                    i = smallerChild; // designate new parent
+                } // end while
+
+                if (this.heapArray.length > 0) {
+                    // put it where it belongs
+                    this.heapArray[i] = temp;
+                }
+
+                // return popped item
+                return item;
+            }
+
+
+            // add item to the bottom of the tree (last item in the array).
+            // bubble item up comparing it to the parent(s)
+            function insert(obj) {
+                // add new item to the bottom of the tree and get its index in the array
+                var childIndex = this.heapArray.push(obj) - 1;
+                // find index of the parent
+                var parentIndex = Math.floor(Math.abs((childIndex - 1) / 2));
+
+                while (childIndex > 0 && this.heapArray[parentIndex].index > obj.index) { // do until either a child reaches the top or parent is <= new item
+                    // shift parent down one level
+                    this.heapArray[childIndex] = this.heapArray[parentIndex];
+                    childIndex = parentIndex;
+                    parentIndex = Math.floor(Math.abs((childIndex - 1) / 2));
+                }
+                // finally put new item where it belongs
+                this.heapArray[childIndex] = obj;
+            }
+
+            function iterateArray() {
+                for (var i = 0; i < this.heapArray.length; i++) {
+                    document.write(this.heapArray[i].index + ' ');
+                }
+            }
+
+        }());
+
+
+
+    </script>
+
+    <script>
+        var canvas = document.getElementById('canvas1');
+        var context = canvas.getContext('2d');
+        var rect = canvas.getBoundingClientRect(); // needed to get a mouse position
+        var VERTEX_BLOCK_OFFSET = 3;
+        var VERTEX_BLOCK_SIZE = 7;
+        var startVertex = null; // start vertex of the path
+        var endVertex = null;   // end vertex of the path
+        var markVertices = false; // indicates the start of the vertices mark process
+        var graph = $Graph.createGraph(); // create graph object
+        var edgeVertex1 = null; // first vertex of an edge
+        var edgeVertex2 = null; // second vertex of an edge
+        var pathVertices = []; // contains all vertices for the shortest path
+
+        /*
+        g.addVertex('New York', 1, 2);
+        g.addVertex('Leningrad', 4, 56);
+        g.addVertex('Moskva', 76, 3);
+        g.addVertex('Kiev', 9, 34);
+        g.addEdge('Leningrad', 'Moskva');
+        g.addEdge('New York', 'Moskva');
+        g.addEdge('Kiev', 'Leningrad');
+        g.showEdges();
+        */
+        context.fillStyle = "#000000";
+        context.strokeStyle = "#000000";
+        context.font = '10pt Calibri';
+
+        // implements Dijkstra's algorithm (here, it's a variation called Uniform Cost Search algorithm)
+        function calculateShortestDistance() {
+            if (startVertex === null || endVertex === null) {
+                alert('Start and end vertices are not marked!');
+                return;
+            }
+            var finalSolution = null;
+            var finalDistance = 0;
+
+            //context.clearRect(0, 0, canvas.width, canvas.height);
+
+            var visitedNodes = []; // set of visited nodes. This is necessary to avoid going backwards which could result in infinite looping
+            fringe = $MinPriorityQueue.createMinPriorityQueue(); // stores objects in this format: { index: <total distance>, data: {vertex: <vertex object>, solution: <[array of vertices]>  } }
+
+            fringe.insert({ index: 0, data: {vertex: startVertex, solution: []} }) // insert the first element
+
+            while ( ! fringe.empty() ) {
+                var t = fringe.remove();
+                var node = t.data.vertex;
+                var solution = t.data.solution;
+                var distance = t.index;
+
+                if (node === endVertex) {
+                    finalSolution = solution; // return last dequeued action path
+                    finalDistance = distance;
+                    break;
+                }
+
+                if (!inVisited(visitedNodes, node)) {
+                    visitedNodes.push(node);
+
+                    // for each successor, put data on the fringe (queue)
+                    for (var i = 0; i < node.connectedVertices.length; i++) {
+                        var successor = node.connectedVertices[i][0];
+                        var weight = node.connectedVertices[i][1];
+                        var newSolution = solution.slice(0);
+                        newSolution.push(successor); // clone existing array and add a new node to it
+                        fringe.insert({ index: distance + weight, data: { vertex: successor, solution: newSolution} });
+                    }
+
+                }
+            }
+
+            if (finalSolution !== null) {
+                document.getElementById('shortestDistance').innerText = 'Distance is ' + finalDistance;
+                //alert(finalSolution);
+                showShortestPath(finalSolution);
+            }
+
+            startVertex = null;
+            endVertex = null;
+            markVertices = false;
+
+        }
+
+
+        function showShortestPath(finalSolution) {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            finalSolution.splice(0, 0, startVertex);
+            var v1 = null;
+            var v2 = null;
+
+            for (var i = 0; i < finalSolution.length - 1; i++) {
+                v1 = finalSolution[i];
+                v2 = finalSolution[i + 1];
+
+                if (!v1.drawn) {
+                    drawVertex(v1.x, v1.y, false);
+                    v1.drawn = true;
+                    pathVertices.push(v1);
+                }
+                if (!v2.drawn) {
+                    drawVertex(v2.x, v2.y, false);
+                    v2.drawn = true;
+                    pathVertices.push(v2);
+                }
+
+                drawMidpointLabel(v1, v2);
+                drawEdge(v1, v2, "red");
+            }
+
+            drawGraph();
+        }
+
+
+        function isInPathVertices(vertex) {
+            for (var i = 0; i < pathVertices.length; i++) {
+                if (vertex === pathVertices[i]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+        function drawGraph() {
+            for (var i = 0; i < graph.vertices.length; i++) {
+                var v = graph.vertices[i];
+            }
+
+            for (var k = 0; k < graph.vertices.length; k++) {
+                var v = graph.vertices[k];
+
+                if (!v.drawn) {
+                    drawVertex(v.x, v.y, false); // draw the vertex
+                    v.drawn = true;
+                }
+
+                // draw edges to unvisited connected vertices
+                for (var i = 0; i < v.connectedVertices.length; i++) {
+                    var connectedVertex = v.connectedVertices[i][0];
+
+                    drawVertex(connectedVertex.x, connectedVertex.y, false); // draw the vertex
+                    connectedVertex.drawn = true;
+                    if (!(isInPathVertices(v) && isInPathVertices(connectedVertex))) {
+                        drawMidpointLabel(v, connectedVertex);
+                        drawEdge(v, connectedVertex, "blue");
+                    }
+                }
+
+            } // outer for
+        }
+
+
+        function drawMidpointLabel(vertex1, vertex2) {
+            var edgeLength = 0,
+                midpoint = 0;
+
+            edgeLength = calculateEdgeLength(vertex1.x, vertex1.y, vertex2.x, vertex2.y);
+            midpoint = getEdgeMidpointCoor(vertex1.x, vertex1.y, vertex2.x, vertex2.y);
+            edgeLength = Math.round(edgeLength);
+
+            context.fillStyle = "red";
+            context.fillText(edgeLength, midpoint.x, midpoint.y);
+
+        }
+
+
+
+        function inVisited(visitedNodes, node) {
+            for (var i = 0; i < visitedNodes.length; i++) {
+                if (visitedNodes[i] === node) return true;
+            }
+
+            return false;
+        }
+
+
+        canvas.addEventListener('click', function (evt) {
+            var mousePos = getMousePos(evt);
+            var vertex = getVertexByCoordinates(mousePos.x, mousePos.y);
+
+            if (vertex === null) { // if new vertex
+                drawVertex(mousePos.x, mousePos.y, true);
+            }
+            else {  // if vertex exists
+                if (markVertices) { // if in the process of marking vertices to calculate shortest path
+                    if (startVertex === null) {
+                        startVertex = vertex;
+                        changeVertexColor(startVertex.x, startVertex.y, "green");
+                    }
+                    else {
+                        if (vertex === startVertex) { // if clicking on the start vertex again
+                            changeVertexColor(startVertex.x, startVertex.y, "black");
+                            startVertex = null;
+                            return;
+                        }
+                        else if (vertex === endVertex) { // if clicking on the end vertex again
+                            changeVertexColor(endVertex.x, endVertex.y, "black");
+                            endVertex = null;
+                            return;
+                        }
+
+                        if (endVertex !== null) { // reset previous end vertex if any
+                            changeVertexColor(endVertex.x, endVertex.y, "black");
+                        }
+                        endVertex = vertex;
+                        changeVertexColor(endVertex.x, endVertex.y, "green");
+                    }
+                }
+                else {
+                    if (edgeVertex1 === null) {
+                        edgeVertex1 = vertex; // create the first point of an edge
+                        changeVertexColor(vertex.x, vertex.y, "#FF0000");
+                    }
+                    else { // create the second point of an edge and create an edge
+                        if (vertex === edgeVertex1) { // if clicking on the same vertex
+                            changeVertexColor(edgeVertex1.x, edgeVertex1.y, "black");
+                            edgeVertex1 = null;
+                            return;
+                        }
+                        edgeVertex2 = vertex;
+                        var edgeLength = calculateEdgeLength(edgeVertex1.x, edgeVertex1.y, edgeVertex2.x, edgeVertex2.y);
+                        var midpoint = getEdgeMidpointCoor(edgeVertex1.x, edgeVertex1.y, edgeVertex2.x, edgeVertex2.y);
+                        edgeLength = Math.round(edgeLength);
+
+
+                        graph.addEdge(edgeVertex1.label, edgeVertex2.label, edgeLength);
+
+                        context.fillStyle = "red";
+                        context.fillText(edgeLength, midpoint.x, midpoint.y);
+
+                        //alert(midpoint.x + ' ' + midpoint.y);
+                        // change color back and reset them
+                        changeVertexColor(edgeVertex1.x, edgeVertex1.y, "black");
+                        drawEdge(edgeVertex1, edgeVertex2, 'blue');
+                        edgeVertex1 = null;
+                        edgeVertex2 = null;
+                    }
+                }
+
+            }
+
+        }, false);
+
+
+
+        function drawEdge(vertex1, vertex2, edgeColor) {
+            context.beginPath(); // this has to be here
+            context.strokeStyle = edgeColor;
+            context.moveTo(vertex1.x, vertex1.y);
+            context.lineTo(vertex2.x, vertex2.y);
+            context.stroke();
+            context.closePath();
+        }
+
+
+        function getEdgeMidpointCoor(x1, y1, x2, y2) {
+            return {
+                x: (x1 + x2) / 2,
+                y: (y1 + y2) / 2
+            }
+        }
+
+
+        function calculateEdgeLength(x1, y1, x2, y2) {
+            var a = Math.pow(x1 - x2, 2);
+            var b = Math.pow(y1 - y2, 2);
+            return Math.sqrt(a + b);
+        }
+
+
+        function changeVertexColor(x, y, color) {
+            for (var i = 0; i < graph.vertices.length; i++) {
+                var v = graph.vertices[i];
+                var x1 = v.x - VERTEX_BLOCK_OFFSET;
+                var x2 = v.x + VERTEX_BLOCK_OFFSET;
+                var y1 = v.y - VERTEX_BLOCK_OFFSET;
+                var y2 = v.y + VERTEX_BLOCK_OFFSET;
+
+                if ((x >= x1 && x <= x2) && (y >= y1 && y <= y2)) {
+                    context.clearRect(x1, y1, VERTEX_BLOCK_SIZE, VERTEX_BLOCK_SIZE);
+                    context.fillStyle = color;
+                    context.fillRect(x1, y1, VERTEX_BLOCK_SIZE, VERTEX_BLOCK_SIZE);
+                }
+            }
+        }
+
+
+
+        function drawVertex(x, y, addVertex) {
+            context.fillStyle = "#000000";
+            context.fillRect(x - VERTEX_BLOCK_OFFSET, y - VERTEX_BLOCK_OFFSET, VERTEX_BLOCK_SIZE, VERTEX_BLOCK_SIZE);
+            var label = x + ',' + y;
+            if (addVertex) graph.addVertex(label, x, y);
+            context.fillText(label, x, y - 10);
+        }
+
+
+        function getVertexByCoordinates(x, y) {
+            var offsetDistance = 3 * VERTEX_BLOCK_OFFSET;
+
+            for (var i = 0; i < graph.vertices.length; i++) {
+                var v = graph.vertices[i];
+
+                var x1 = v.x - offsetDistance;
+                var x2 = v.x + offsetDistance;
+                var y1 = v.y - offsetDistance;
+                var y2 = v.y + offsetDistance;
+
+                if ((x >= x1 && x <= x2) && (y >= y1 && y <= y2)) {
+                    return v;
+                }
+            }
+            return null;
+        }
+
+
+
+        function getMousePos(evt) {
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+
+        function startMarkingVertices() {
+            resetVertices();
+            markVertices = true;
+        }
+
+
+        function cancelMarkingVertices() {
+            resetVertices();
+            markVertices = false;
+        }
+
+
+        function resetVertices() {
+            if (startVertex !== null) changeVertexColor(startVertex.x, startVertex.y, "black");
+            if (endVertex !== null) changeVertexColor(endVertex.x, endVertex.y, "black");
+
+            startVertex = null;
+            endVertex = null;
+        }
+
+
+    </script>
+
+
+</body>
+</html>
